@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FEGOSA – Análisis de Precios por Animal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; color: #1a2b3c; min-height: 100vh; }
+
+  header {
+    background: linear-gradient(135deg, #0d2b4e 0%, #1a5276 100%);
+    color: white;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
+  header .logo { font-size: 2.2rem; }
+  header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.5px; }
+  header p { font-size: 0.85rem; opacity: 0.75; margin-top: 2px; }
+
+  .controls {
+    background: white;
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .control-group { display: flex; flex-direction: column; gap: 5px; }
+  .control-group label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #4a6785; letter-spacing: 0.6px; }
+
+  .year-tabs { display: flex; gap: 0; border-radius: 8px; overflow: hidden; border: 2px solid #1a5276; }
+  .year-tab {
+    padding: 8px 24px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: white;
+    color: #1a5276;
+    border: none;
+    transition: all 0.2s;
+  }
+  .year-tab.active { background: #1a5276; color: white; }
+  .year-tab:hover:not(.active) { background: #e8f0fb; }
+
+  select {
+    padding: 9px 36px 9px 14px;
+    font-size: 0.95rem;
+    border: 2px solid #c8d8e8;
+    border-radius: 8px;
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231a5276' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    appearance: none;
+    cursor: pointer;
+    color: #1a2b3c;
+    min-width: 260px;
+    font-weight: 600;
+    transition: border-color 0.2s;
+  }
+  select:focus { outline: none; border-color: #1a5276; }
+
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    padding: 20px 32px 0;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 22px;
+    min-width: 160px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    border-left: 4px solid #1a5276;
+    flex: 1;
+    max-width: 220px;
+  }
+  .stat-card.max { border-left-color: #e74c3c; }
+  .stat-card.min { border-left-color: #2ecc71; }
+  .stat-card.avg { border-left-color: #3498db; }
+  .stat-card.cnt { border-left-color: #9b59b6; }
+  .stat-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #6b8caa; letter-spacing: 0.5px; }
+  .stat-value { font-size: 1.5rem; font-weight: 800; margin-top: 4px; color: #1a2b3c; }
+  .stat-sub { font-size: 0.72rem; color: #8ba5c0; margin-top: 2px; }
+
+  .chart-container {
+    margin: 20px 32px 32px;
+    background: white;
+    border-radius: 14px;
+    padding: 28px 28px 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    position: relative;
+  }
+  .chart-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a2b3c;
+    margin-bottom: 6px;
+  }
+  .chart-subtitle {
+    font-size: 0.8rem;
+    color: #8ba5c0;
+    margin-bottom: 20px;
+  }
+  canvas { max-height: 420px; }
+
+  .no-data {
+    text-align: center;
+    padding: 60px;
+    color: #8ba5c0;
+    font-size: 1.1rem;
+  }
+  .legend-custom {
+    display: flex;
+    gap: 20px;
+    margin-top: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; color: #4a6785; font-weight: 600; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .legend-band { width: 20px; height: 10px; border-radius: 3px; opacity: 0.35; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🐄</div>
+  <div>
+    <h1>FEGOSA – Análisis de Precios por Animal</h1>
+    <p>Promedio General mensual con fluctuaciones de Máximo y Mínimo</p>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Año</label>
+    <div class="year-tabs">
+      <button class="year-tab active" onclick="setYear('2024')">2024</button>
+      <button class="year-tab" onclick="setYear('2025')">2025</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>Tipo de Animal</label>
+    <select id="animalSelect" onchange="renderChart()"></select>
+  </div>
+</div>
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="chart-container">
+  <div class="chart-title" id="chartTitle">Promedio General Mensual</div>
+  <div class="chart-subtitle" id="chartSubtitle"></div>
+  <canvas id="mainChart"></canvas>
+  <div class="legend-custom">
+    <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div> Máximo mensual</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3498db"></div> Promedio mensual</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2ecc71"></div> Mínimo mensual</div>
+    <div class="legend-item"><div class="legend-band" style="background:#3498db"></div> Rango Min–Max</div>
+  </div>
+</div>
+
+<script>
+const RAW = {"data": {"2024": {"BUEYES": {"1": {"mean": 899.58, "min": 762.98, "max": 1118.92, "count": 4}, "2": {"mean": 855.4, "min": 733.03, "max": 1058.77, "count": 4}, "3": {"mean": 884.18, "min": 653.53, "max": 1039.3, "count": 4}, "4": {"mean": 1073.96, "min": 935.77, "max": 1300.0, "count": 5}, "5": {"mean": 848.0, "min": 616.7, "max": 1031.68, "count": 3}, "6": {"mean": 968.22, "min": 949.44, "max": 987.0, "count": 2}, "7": {"mean": 1199.17, "min": 923.44, "max": 1502.06, "count": 4}, "8": {"mean": 1253.25, "min": 1121.35, "max": 1400.0, "count": 4}, "9": {"mean": 1093.89, "min": 1062.8, "max": 1118.12, "count": 3}, "10": {"mean": 1291.76, "min": 1092.65, "max": 1629.63, "count": 5}, "11": {"mean": 1157.8, "min": 1004.43, "max": 1267.24, "count": 4}, "12": {"mean": 1180.57, "min": 1092.65, "max": 1309.37, "count": 3}}, "CABALLAR": {"7": {"mean": 975.74, "min": 975.74, "max": 975.74, "count": 1}}, "CABALLARES": {"1": {"mean": 801.35, "min": 662.58, "max": 879.89, "count": 3}, "2": {"mean": 831.28, "min": 500.0, "max": 1033.0, "count": 4}, "3": {"mean": 830.95, "min": 700.0, "max": 908.54, "count": 3}, "4": {"mean": 1401.7, "min": 758.79, "max": 3126.0, "count": 4}, "5": {"mean": 857.58, "min": 836.35, "max": 878.82, "count": 2}, "6": {"mean": 791.22, "min": 750.0, "max": 813.17, "count": 3}, "7": {"mean": 922.3, "min": 922.3, "max": 922.3, "count": 1}, "8": {"mean": 1000.0, "min": 1000.0, "max": 1000.0, "count": 1}, "9": {"mean": 954.26, "min": 894.37, "max": 1014.16, "count": 2}, "10": {"mean": 1130.27, "min": 1031.63, "max": 1185.83, "count": 3}, "11": {"mean": 1077.33, "min": 1024.52, "max": 1182.82, "count": 3}, "12": {"mean": 980.92, "min": 971.34, "max": 990.49, "count": 2}}, "CERDO (INDUSTRIAL)": {"1": {"mean": 625.33, "min": 605.3, "max": 645.36, "count": 2}, "2": {"mean": 992.51, "min": 833.79, "max": 1243.73, "count": 3}, "3": {"mean": 926.06, "min": 760.62, "max": 1232.93, "count": 4}, "4": {"mean": 1288.0, "min": 1092.14, "max": 1445.79, "count": 4}, "5": {"mean": 989.45, "min": 946.96, "max": 1031.94, "count": 2}, "6": {"mean": 839.29, "min": 608.13, "max": 1089.74, "count": 3}, "7": {"mean": 941.58, "min": 756.38, "max": 1116.69, "count": 3}, "8": {"mean": 1035.7, "min": 900.0, "max": 1171.39, "count": 2}, "9": {"mean": 1182.86, "min": 1034.15, "max": 1331.58, "count": 2}, "10": {"mean": 1325.28, "min": 1058.07, "max": 1530.08, "count": 3}, "11": {"mean": 846.27, "min": 715.08, "max": 970.0, "count": 4}, "12": {"mean": 1300.63, "min": 800.0, "max": 1954.11, "count": 3}}, "CERDO (MALTON)": {"1": {"mean": 1383.13, "min": 983.53, "max": 1598.1, "count": 4}, "2": {"mean": 1458.8, "min": 1299.0, "max": 1580.8, "count": 3}, "3": {"mean": 1475.67, "min": 1364.67, "max": 1615.45, "count": 4}, "4": {"mean": 1583.62, "min": 1569.57, "max": 1597.68, "count": 2}, "5": {"mean": 1558.68, "min": 1310.91, "max": 1810.97, "count": 3}, "6": {"mean": 1957.07, "min": 1812.81, "max": 2169.03, "count": 4}, "7": {"mean": 2182.58, "min": 2121.88, "max": 2243.29, "count": 2}, "8": {"mean": 2224.5, "min": 2101.73, "max": 2412.93, "count": 4}, "9": {"mean": 2358.78, "min": 2059.15, "max": 2704.32, "count": 3}, "10": {"mean": 2081.68, "min": 1751.09, "max": 2293.11, "count": 4}, "11": {"mean": 1983.57, "min": 1536.07, "max": 2438.43, "count": 4}, "12": {"mean": 2206.7, "min": 1806.78, "max": 2594.07, "count": 3}}, "CERDO INDUSTRIAL": {"7": {"mean": 1194.87, "min": 1194.87, "max": 1194.87, "count": 1}}, "CERDO MALTON": {"7": {"mean": 2164.7, "min": 2164.7, "max": 2164.7, "count": 1}}, "CORDEROS": {"1": {"mean": 1612.88, "min": 1402.78, "max": 1822.97, "count": 2}}, "NOV.GORDO EXPORT": {"10": {"mean": 1600.0, "min": 1600.0, "max": 1600.0, "count": 1}}, "NOVILLO GORDO": {"1": {"mean": 1343.46, "min": 1239.25, "max": 1422.16, "count": 4}, "2": {"mean": 1242.92, "min": 1187.77, "max": 1362.46, "count": 4}, "3": {"mean": 1335.63, "min": 1055.98, "max": 1573.15, "count": 4}, "4": {"mean": 1443.61, "min": 1320.54, "max": 1580.0, "count": 5}, "5": {"mean": 1460.91, "min": 1310.7, "max": 1672.41, "count": 3}, "6": {"mean": 1507.17, "min": 1439.11, "max": 1634.9, "count": 4}, "7": {"mean": 1537.4, "min": 850.0, "max": 1890.0, "count": 3}, "8": {"mean": 1616.62, "min": 1492.95, "max": 1700.0, "count": 4}, "9": {"mean": 1687.43, "min": 1569.28, "max": 1775.19, "count": 3}, "10": {"mean": 1729.52, "min": 1330.28, "max": 1973.13, "count": 4}, "11": {"mean": 1794.2, "min": 1602.9, "max": 1926.87, "count": 3}, "12": {"mean": 1762.76, "min": 1714.59, "max": 1819.31, "count": 3}}, "NOVILLO GORDO 6D": {"10": {"mean": 1645.0, "min": 1590.0, "max": 1700.0, "count": 2}, "11": {"mean": 1525.0, "min": 1400.0, "max": 1650.0, "count": 2}, "12": {"mean": 800.0, "min": 800.0, "max": 800.0, "count": 1}}, "NOVILLO P/ENGORDA": {"7": {"mean": 1479.13, "min": 1479.13, "max": 1479.13, "count": 1}}, "NOVILLOS P/EGDA.": {"1": {"mean": 1378.35, "min": 1301.55, "max": 1443.81, "count": 4}, "2": {"mean": 1246.87, "min": 981.28, "max": 1457.23, "count": 4}, "3": {"mean": 1275.56, "min": 1066.56, "max": 1369.04, "count": 4}, "4": {"mean": 1494.08, "min": 1414.25, "max": 1627.68, "count": 5}, "5": {"mean": 1330.39, "min": 1192.95, "max": 1407.61, "count": 3}, "6": {"mean": 1403.98, "min": 1281.56, "max": 1474.99, "count": 4}, "7": {"mean": 1542.23, "min": 1468.0, "max": 1677.32, "count": 3}, "8": {"mean": 1769.82, "min": 1724.38, "max": 1803.98, "count": 4}, "9": {"mean": 1661.89, "min": 1591.34, "max": 1701.6, "count": 3}, "10": {"mean": 1788.9, "min": 1689.3, "max": 1962.0, "count": 5}, "11": {"mean": 1739.91, "min": 1586.86, "max": 1986.25, "count": 4}, "12": {"mean": 1793.26, "min": 1699.26, "max": 1905.55, "count": 3}}, "OVEJAS": {"1": {"mean": 608.76, "min": 545.45, "max": 721.78, "count": 4}}, "TERNERA": {"7": {"mean": 1202.56, "min": 1202.56, "max": 1202.56, "count": 1}}, "TERNERAS": {"1": {"mean": 1340.69, "min": 1274.06, "max": 1439.01, "count": 4}, "2": {"mean": 1293.44, "min": 1188.09, "max": 1386.57, "count": 4}, "3": {"mean": 1352.52, "min": 1284.23, "max": 1405.09, "count": 4}, "4": {"mean": 1354.67, "min": 1284.19, "max": 1443.57, "count": 5}, "5": {"mean": 1289.12, "min": 1250.24, "max": 1320.73, "count": 3}, "6": {"mean": 1328.26, "min": 1216.78, "max": 1411.27, "count": 4}, "7": {"mean": 1640.59, "min": 1554.18, "max": 1726.77, "count": 3}, "8": {"mean": 1643.36, "min": 1569.4, "max": 1753.96, "count": 4}, "9": {"mean": 1567.13, "min": 1506.48, "max": 1618.42, "count": 3}, "10": {"mean": 1815.37, "min": 1730.5, "max": 1935.25, "count": 5}, "11": {"mean": 1786.55, "min": 1641.99, "max": 1936.94, "count": 4}, "12": {"mean": 1748.0, "min": 1628.24, "max": 1898.74, "count": 3}}, "TERNERO": {"7": {"mean": 1641.53, "min": 1641.53, "max": 1641.53, "count": 1}}, "TERNEROS": {"1": {"mean": 1513.13, "min": 1470.76, "max": 1548.59, "count": 4}, "2": {"mean": 1456.72, "min": 1397.24, "max": 1554.61, "count": 4}, "3": {"mean": 1486.35, "min": 1361.71, "max": 1545.65, "count": 4}, "4": {"mean": 1501.01, "min": 1440.98, "max": 1574.6, "count": 5}, "5": {"mean": 1406.9, "min": 1299.05, "max": 1485.18, "count": 3}, "6": {"mean": 1467.32, "min": 1303.44, "max": 1575.91, "count": 4}, "7": {"mean": 1721.98, "min": 1706.51, "max": 1735.35, "count": 3}, "8": {"mean": 1761.42, "min": 1728.27, "max": 1803.65, "count": 4}, "9": {"mean": 1745.39, "min": 1517.65, "max": 1915.22, "count": 3}, "10": {"mean": 1945.98, "min": 1882.24, "max": 2008.11, "count": 5}, "11": {"mean": 1940.51, "min": 1927.4, "max": 1964.36, "count": 4}, "12": {"mean": 1831.17, "min": 1691.63, "max": 1950.94, "count": 3}}, "TORETE": {"7": {"mean": 1289.74, "min": 1289.74, "max": 1289.74, "count": 1}}, "TORETES": {"1": {"mean": 1132.14, "min": 925.96, "max": 1362.38, "count": 4}, "2": {"mean": 1154.43, "min": 1055.19, "max": 1279.82, "count": 4}, "3": {"mean": 1333.59, "min": 1271.61, "max": 1465.46, "count": 4}, "4": {"mean": 1306.01, "min": 650.0, "max": 1600.0, "count": 5}, "5": {"mean": 1259.24, "min": 1138.71, "max": 1373.1, "count": 3}, "6": {"mean": 1195.81, "min": 955.07, "max": 1351.51, "count": 4}, "7": {"mean": 1451.09, "min": 1401.97, "max": 1536.85, "count": 3}, "8": {"mean": 1653.94, "min": 1500.87, "max": 1931.94, "count": 4}, "9": {"mean": 1772.51, "min": 1682.29, "max": 1950.0, "count": 3}, "10": {"mean": 1557.13, "min": 1380.0, "max": 1797.82, "count": 5}, "11": {"mean": 1655.87, "min": 1329.58, "max": 1968.14, "count": 4}, "12": {"mean": 1506.57, "min": 1231.75, "max": 1658.56, "count": 3}}, "TORO": {"7": {"mean": 1338.86, "min": 1338.86, "max": 1338.86, "count": 1}}, "TOROS": {"1": {"mean": 1024.38, "min": 962.79, "max": 1097.04, "count": 4}, "2": {"mean": 2048.93, "min": 838.91, "max": 5342.0, "count": 4}, "3": {"mean": 1027.87, "min": 905.06, "max": 1175.85, "count": 4}, "4": {"mean": 1091.72, "min": 1042.47, "max": 1204.16, "count": 5}, "5": {"mean": 987.91, "min": 911.32, "max": 1080.16, "count": 3}, "6": {"mean": 1061.13, "min": 960.33, "max": 1134.27, "count": 4}, "7": {"mean": 1286.98, "min": 1150.0, "max": 1393.1, "count": 3}, "8": {"mean": 1397.26, "min": 1271.4, "max": 1504.26, "count": 4}, "9": {"mean": 1322.41, "min": 1191.62, "max": 1471.89, "count": 3}, "10": {"mean": 1481.33, "min": 1351.19, "max": 1801.14, "count": 5}, "11": {"mean": 1395.66, "min": 1269.86, "max": 1584.74, "count": 4}, "12": {"mean": 1368.19, "min": 1238.43, "max": 1455.98, "count": 3}}, "VACA CARNAZA": {"1": {"mean": 626.18, "min": 513.46, "max": 725.72, "count": 4}, "2": {"mean": 598.9, "min": 499.0, "max": 790.0, "count": 4}, "3": {"mean": 548.57, "min": 381.52, "max": 679.65, "count": 4}, "4": {"mean": 682.75, "min": 527.22, "max": 1046.0, "count": 5}, "5": {"mean": 474.87, "min": 457.04, "max": 491.62, "count": 3}, "6": {"mean": 476.89, "min": 403.78, "max": 550.0, "count": 2}, "7": {"mean": 604.98, "min": 467.69, "max": 803.93, "count": 3}, "8": {"mean": 653.14, "min": 607.28, "max": 699.01, "count": 2}, "9": {"mean": 823.52, "min": 823.52, "max": 823.52, "count": 1}, "10": {"mean": 807.61, "min": 664.25, "max": 965.67, "count": 5}, "11": {"mean": 692.44, "min": 650.76, "max": 734.12, "count": 2}, "12": {"mean": 861.0, "min": 849.44, "max": 873.63, "count": 3}}, "VACA CARNAZA EXPORT": {"1": {"mean": 944.34, "min": 587.84, "max": 1116.83, "count": 4}, "2": {"mean": 858.68, "min": 652.96, "max": 1165.85, "count": 4}, "3": {"mean": 658.22, "min": 611.72, "max": 727.67, "count": 4}, "4": {"mean": 782.99, "min": 650.0, "max": 949.34, "count": 5}, "5": {"mean": 695.44, "min": 645.2, "max": 737.45, "count": 3}, "6": {"mean": 664.29, "min": 613.77, "max": 701.53, "count": 4}, "7": {"mean": 879.93, "min": 727.78, "max": 1012.15, "count": 4}, "8": {"mean": 807.88, "min": 684.83, "max": 934.61, "count": 4}, "9": {"mean": 934.28, "min": 921.04, "max": 947.52, "count": 2}, "10": {"mean": 929.32, "min": 747.67, "max": 1060.3, "count": 4}, "11": {"mean": 943.21, "min": 924.71, "max": 966.1, "count": 3}, "12": {"mean": 970.18, "min": 700.0, "max": 1240.35, "count": 2}}, "VACA EXPORTACION": {"7": {"mean": 1195.53, "min": 1195.53, "max": 1195.53, "count": 1}}, "VACA GORDA": {"7": {"mean": 1138.92, "min": 1138.92, "max": 1138.92, "count": 1}}, "VACA P/ENGORDA": {"7": {"mean": 771.35, "min": 771.35, "max": 771.35, "count": 1}}, "VACA PARIDA": {"1": {"mean": 1129.31, "min": 1055.66, "max": 1178.18, "count": 4}, "2": {"mean": 1110.59, "min": 982.0, "max": 1359.6, "count": 4}, "3": {"mean": 955.84, "min": 842.6, "max": 1056.79, "count": 4}, "4": {"mean": 1027.53, "min": 987.61, "max": 1089.69, "count": 5}, "5": {"mean": 1010.92, "min": 933.49, "max": 1085.82, "count": 3}, "6": {"mean": 1120.99, "min": 980.26, "max": 1265.98, "count": 4}, "7": {"mean": 1213.29, "min": 1145.19, "max": 1300.0, "count": 4}, "8": {"mean": 1229.27, "min": 1111.67, "max": 1290.73, "count": 4}, "9": {"mean": 1187.75, "min": 1110.67, "max": 1277.16, "count": 3}, "10": {"mean": 1325.87, "min": 1242.98, "max": 1425.77, "count": 5}, "11": {"mean": 1332.38, "min": 1112.15, "max": 1559.92, "count": 4}, "12": {"mean": 1381.03, "min": 1262.7, "max": 1527.05, "count": 3}}, "VACAS EXPORTACION": {"1": {"mean": 1176.92, "min": 1049.88, "max": 1275.44, "count": 4}, "2": {"mean": 1150.89, "min": 1061.03, "max": 1321.01, "count": 4}, "3": {"mean": 1054.45, "min": 947.0, "max": 1173.27, "count": 4}, "4": {"mean": 1044.16, "min": 989.14, "max": 1100.2, "count": 5}, "5": {"mean": 925.29, "min": 866.5, "max": 980.01, "count": 3}, "6": {"mean": 938.71, "min": 902.61, "max": 960.64, "count": 4}, "7": {"mean": 1254.91, "min": 1149.34, "max": 1369.98, "count": 3}, "8": {"mean": 1251.69, "min": 1175.98, "max": 1295.45, "count": 4}, "9": {"mean": 1255.07, "min": 1161.91, "max": 1333.6, "count": 3}, "10": {"mean": 1445.12, "min": 1380.05, "max": 1506.06, "count": 5}, "11": {"mean": 1326.6, "min": 1210.93, "max": 1423.5, "count": 4}, "12": {"mean": 1359.94, "min": 1280.8, "max": 1421.42, "count": 3}}, "VACAS GORDAS": {"1": {"mean": 949.95, "min": 816.89, "max": 1067.98, "count": 4}, "2": {"mean": 906.92, "min": 868.32, "max": 949.59, "count": 4}, "3": {"mean": 914.49, "min": 849.01, "max": 972.12, "count": 4}, "4": {"mean": 911.92, "min": 811.76, "max": 974.11, "count": 5}, "5": {"mean": 892.77, "min": 882.09, "max": 904.12, "count": 3}, "6": {"mean": 923.67, "min": 888.07, "max": 961.92, "count": 4}, "7": {"mean": 1178.49, "min": 1100.24, "max": 1225.81, "count": 3}, "8": {"mean": 1229.39, "min": 1186.74, "max": 1273.56, "count": 4}, "9": {"mean": 1160.6, "min": 1074.06, "max": 1206.37, "count": 3}, "10": {"mean": 1344.17, "min": 1284.82, "max": 1416.15, "count": 5}, "11": {"mean": 1147.61, "min": 1077.6, "max": 1217.5, "count": 4}, "12": {"mean": 1233.91, "min": 1214.14, "max": 1267.87, "count": 3}}, "VACAS GORDAS 6D": {"9": {"mean": 1171.06, "min": 817.23, "max": 1524.9, "count": 2}, "10": {"mean": 1377.96, "min": 1203.47, "max": 1702.44, "count": 5}, "11": {"mean": 1432.26, "min": 1149.94, "max": 1748.6, "count": 4}, "12": {"mean": 1418.86, "min": 1244.15, "max": 1566.53, "count": 3}}, "VACAS P/ENGORDA": {"1": {"mean": 911.52, "min": 732.8, "max": 1116.11, "count": 4}, "2": {"mean": 751.04, "min": 696.51, "max": 862.93, "count": 4}, "3": {"mean": 744.24, "min": 703.41, "max": 781.59, "count": 4}, "4": {"mean": 846.09, "min": 760.45, "max": 912.64, "count": 5}, "5": {"mean": 784.17, "min": 743.33, "max": 813.67, "count": 3}, "6": {"mean": 718.39, "min": 657.45, "max": 763.03, "count": 4}, "7": {"mean": 943.34, "min": 867.95, "max": 991.07, "count": 3}, "8": {"mean": 1001.63, "min": 948.49, "max": 1058.08, "count": 4}, "9": {"mean": 1082.85, "min": 1022.48, "max": 1148.3, "count": 3}, "10": {"mean": 1156.47, "min": 1032.73, "max": 1264.28, "count": 5}, "11": {"mean": 1051.32, "min": 995.63, "max": 1130.45, "count": 4}, "12": {"mean": 1125.74, "min": 1078.56, "max": 1197.78, "count": 3}}, "VAQUILLA GORDA": {"7": {"mean": 1594.12, "min": 1594.12, "max": 1594.12, "count": 1}}, "VAQUILLA GORDA EXPOR": {"7": {"mean": 1353.08, "min": 1353.08, "max": 1353.08, "count": 1}}, "VAQUILLA GORDA EXPORT": {"1": {"mean": 1347.38, "min": 1254.0, "max": 1443.53, "count": 4}, "2": {"mean": 1154.36, "min": 1010.08, "max": 1284.96, "count": 4}, "3": {"mean": 1242.12, "min": 1158.34, "max": 1379.27, "count": 4}, "4": {"mean": 1266.36, "min": 994.78, "max": 1427.08, "count": 5}, "5": {"mean": 1312.09, "min": 1285.62, "max": 1349.75, "count": 3}, "6": {"mean": 1174.3, "min": 941.08, "max": 1364.48, "count": 4}, "7": {"mean": 1439.13, "min": 1351.88, "max": 1532.33, "count": 3}, "8": {"mean": 1486.42, "min": 1281.68, "max": 1662.23, "count": 4}, "9": {"mean": 1378.05, "min": 1343.63, "max": 1431.88, "count": 3}, "10": {"mean": 1714.76, "min": 1603.76, "max": 1829.12, "count": 5}, "11": {"mean": 1685.47, "min": 1551.17, "max": 1818.54, "count": 4}, "12": {"mean": 1592.76, "min": 1472.52, "max": 1703.47, "count": 3}}, "VAQUILLA P/ENGORDA": {"7": {"mean": 1406.0, "min": 1406.0, "max": 1406.0, "count": 1}}, "VAQUILLAS ENGORDA": {"1": {"mean": 1281.81, "min": 1193.31, "max": 1400.86, "count": 4}, "2": {"mean": 1123.76, "min": 1052.4, "max": 1235.51, "count": 4}, "3": {"mean": 1244.79, "min": 1068.59, "max": 1388.11, "count": 4}, "4": {"mean": 1278.31, "min": 1185.88, "max": 1372.29, "count": 5}, "5": {"mean": 1258.13, "min": 1198.56, "max": 1318.46, "count": 3}, "6": {"mean": 1244.27, "min": 1087.55, "max": 1400.21, "count": 4}, "7": {"mean": 1456.23, "min": 1381.77, "max": 1505.62, "count": 3}, "8": {"mean": 1531.99, "min": 1415.46, "max": 1585.68, "count": 4}, "9": {"mean": 1475.48, "min": 1399.02, "max": 1533.41, "count": 3}, "10": {"mean": 1716.08, "min": 1659.77, "max": 1763.5, "count": 5}, "11": {"mean": 1679.17, "min": 1575.45, "max": 1747.56, "count": 4}, "12": {"mean": 1619.35, "min": 1492.64, "max": 1700.56, "count": 3}}, "VAQUILLAS GORDAS": {"1": {"mean": 1383.83, "min": 1141.3, "max": 1544.63, "count": 4}, "2": {"mean": 1399.18, "min": 1355.24, "max": 1488.34, "count": 4}, "3": {"mean": 1438.33, "min": 1330.99, "max": 1515.57, "count": 4}, "4": {"mean": 1508.99, "min": 1379.32, "max": 1690.0, "count": 5}, "5": {"mean": 1368.61, "min": 1199.99, "max": 1503.09, "count": 3}, "6": {"mean": 1486.36, "min": 1379.06, "max": 1575.59, "count": 4}, "7": {"mean": 1687.22, "min": 1621.65, "max": 1724.52, "count": 3}, "8": {"mean": 1798.64, "min": 1754.2, "max": 1858.55, "count": 4}, "9": {"mean": 1667.03, "min": 1493.31, "max": 1777.65, "count": 3}, "10": {"mean": 1820.99, "min": 1722.72, "max": 1947.43, "count": 5}, "11": {"mean": 1802.34, "min": 1741.7, "max": 1926.46, "count": 4}, "12": {"mean": 1760.84, "min": 1684.43, "max": 1894.26, "count": 3}}}, "2025": {"BUEYES": {"1": {"mean": 1113.44, "min": 1032.72, "max": 1209.0, "count": 4}, "2": {"mean": 1076.23, "min": 1030.0, "max": 1106.93, "count": 4}, "3": {"mean": 826.25, "min": 114.0, "max": 1258.0, "count": 4}, "4": {"mean": 775.5, "min": 106.0, "max": 1083.0, "count": 4}, "5": {"mean": 1069.0, "min": 972.0, "max": 1143.0, "count": 4}, "6": {"mean": 1329.0, "min": 1267.0, "max": 1446.0, "count": 4}, "7": {"mean": 1431.2, "min": 1189.0, "max": 1649.0, "count": 5}, "8": {"mean": 1338.75, "min": 1167.0, "max": 1418.0, "count": 4}, "9": {"mean": 110.67, "min": 2.0, "max": 171.0, "count": 3}, "10": {"mean": 924.75, "min": 149.0, "max": 1749.0, "count": 4}, "11": {"mean": 1551.33, "min": 1403.0, "max": 1632.0, "count": 3}, "12": {"mean": 1109.67, "min": 135.0, "max": 1639.0, "count": 3}}, "CABALLARES": {"1": {"mean": 979.26, "min": 911.04, "max": 1071.05, "count": 4}, "2": {"mean": 936.0, "min": 902.7, "max": 969.29, "count": 2}, "3": {"mean": 516.67, "min": 1.0, "max": 840.0, "count": 3}, "4": {"mean": 12.0, "min": 12.0, "max": 12.0, "count": 1}, "5": {"mean": 823.33, "min": 664.0, "max": 1023.0, "count": 3}, "6": {"mean": 646.67, "min": 1.0, "max": 1139.0, "count": 3}, "7": {"mean": 886.33, "min": 105.0, "max": 1286.0, "count": 3}, "8": {"mean": 503.5, "min": 1.0, "max": 1006.0, "count": 2}, "9": {"mean": 699.5, "min": 143.0, "max": 1256.0, "count": 2}, "10": {"mean": 870.0, "min": 870.0, "max": 870.0, "count": 1}, "12": {"mean": 57.5, "min": 12.0, "max": 103.0, "count": 2}}, "CERDO (INDUSTRIAL)": {"1": {"mean": 1000.0, "min": 1000.0, "max": 1000.0, "count": 1}, "2": {"mean": 1074.0, "min": 1000.0, "max": 1200.0, "count": 4}}, "CERDO (MALTON)": {"1": {"mean": 1636.72, "min": 1617.09, "max": 1656.36, "count": 2}, "2": {"mean": 1804.72, "min": 1522.4, "max": 2124.06, "count": 4}}, "NOVILLO GORDO": {"1": {"mean": 1644.68, "min": 1397.49, "max": 1826.55, "count": 3}, "2": {"mean": 1813.34, "min": 1798.11, "max": 1820.0, "count": 4}, "3": {"mean": 1814.75, "min": 1731.0, "max": 1875.0, "count": 4}, "4": {"mean": 1841.6, "min": 1552.0, "max": 1963.0, "count": 5}, "5": {"mean": 1416.25, "min": 185.0, "max": 1864.0, "count": 4}, "6": {"mean": 1878.0, "min": 1832.0, "max": 1983.0, "count": 4}, "7": {"mean": 1514.25, "min": 203.0, "max": 2104.0, "count": 4}, "8": {"mean": 1800.5, "min": 232.0, "max": 2589.0, "count": 4}, "9": {"mean": 2430.33, "min": 2217.0, "max": 2582.0, "count": 3}, "10": {"mean": 2174.5, "min": 1812.0, "max": 2542.0, "count": 4}, "11": {"mean": 2544.67, "min": 2139.0, "max": 2886.0, "count": 3}, "12": {"mean": 1828.4, "min": 197.0, "max": 2618.0, "count": 5}}, "NOVILLO GORDO 6D": {"1": {"mean": 1325.0, "min": 1250.0, "max": 1400.0, "count": 2}, "2": {"mean": 1215.0, "min": 1160.0, "max": 1270.0, "count": 2}, "3": {"mean": 492.33, "min": 11.0, "max": 1451.0, "count": 3}, "4": {"mean": 386.75, "min": 16.0, "max": 1377.0, "count": 4}, "5": {"mean": 120.0, "min": 16.0, "max": 178.0, "count": 3}, "6": {"mean": 1483.0, "min": 1483.0, "max": 1483.0, "count": 1}, "7": {"mean": 1108.33, "min": 155.0, "max": 1637.0, "count": 3}, "8": {"mean": 772.0, "min": 141.0, "max": 1403.0, "count": 2}, "9": {"mean": 1974.0, "min": 1974.0, "max": 1974.0, "count": 1}, "11": {"mean": 1285.33, "min": 153.0, "max": 2024.0, "count": 3}, "12": {"mean": 2407.0, "min": 2407.0, "max": 2407.0, "count": 1}}, "NOVILLOS P/EGDA.": {"1": {"mean": 1706.69, "min": 1579.55, "max": 1799.45, "count": 4}, "2": {"mean": 1717.46, "min": 1595.07, "max": 1762.46, "count": 4}, "3": {"mean": 1733.5, "min": 1564.0, "max": 1899.0, "count": 4}, "4": {"mean": 1841.8, "min": 1691.0, "max": 1961.0, "count": 5}, "5": {"mean": 1502.25, "min": 199.0, "max": 2049.0, "count": 4}, "6": {"mean": 1824.5, "min": 1739.0, "max": 1889.0, "count": 4}, "7": {"mean": 1889.8, "min": 1374.0, "max": 2194.0, "count": 5}, "8": {"mean": 2204.0, "min": 1848.0, "max": 2442.0, "count": 4}, "9": {"mean": 1873.0, "min": 285.0, "max": 2473.0, "count": 4}, "10": {"mean": 2531.5, "min": 2487.0, "max": 2565.0, "count": 4}, "11": {"mean": 2391.0, "min": 2114.0, "max": 2626.0, "count": 3}, "12": {"mean": 1845.6, "min": 204.0, "max": 2572.0, "count": 5}}, "TERNERAS": {"1": {"mean": 1596.98, "min": 1540.48, "max": 1649.09, "count": 4}, "2": {"mean": 1484.71, "min": 1318.3, "max": 1663.77, "count": 4}, "3": {"mean": 1335.75, "min": 166.0, "max": 1811.0, "count": 4}, "4": {"mean": 1558.6, "min": 171.0, "max": 1984.0, "count": 5}, "5": {"mean": 1873.25, "min": 1836.0, "max": 1946.0, "count": 4}, "6": {"mean": 1976.5, "min": 1877.0, "max": 2015.0, "count": 4}, "7": {"mean": 2228.0, "min": 2123.0, "max": 2302.0, "count": 5}, "8": {"mean": 2588.25, "min": 2533.0, "max": 2639.0, "count": 4}, "9": {"mean": 2668.5, "min": 2471.0, "max": 2837.0, "count": 4}, "10": {"mean": 2234.0, "min": 284.0, "max": 2922.0, "count": 4}, "11": {"mean": 1925.0, "min": 223.0, "max": 2806.0, "count": 3}, "12": {"mean": 1739.4, "min": 242.0, "max": 2658.0, "count": 5}}, "TERNEROS": {"1": {"mean": 1784.71, "min": 1678.61, "max": 1859.29, "count": 4}, "2": {"mean": 1762.15, "min": 1711.66, "max": 1799.41, "count": 4}, "3": {"mean": 1449.25, "min": 197.0, "max": 1899.0, "count": 4}, "4": {"mean": 1648.4, "min": 187.0, "max": 2087.0, "count": 5}, "5": {"mean": 2010.25, "min": 1872.0, "max": 2112.0, "count": 4}, "6": {"mean": 2056.75, "min": 1964.0, "max": 2214.0, "count": 4}, "7": {"mean": 2279.8, "min": 2072.0, "max": 2387.0, "count": 5}, "8": {"mean": 2645.5, "min": 2559.0, "max": 2692.0, "count": 4}, "9": {"mean": 2846.5, "min": 2682.0, "max": 3068.0, "count": 4}, "10": {"mean": 2945.25, "min": 2858.0, "max": 3055.0, "count": 4}, "11": {"mean": 2724.67, "min": 2412.0, "max": 2915.0, "count": 3}, "12": {"mean": 2329.6, "min": 2131.0, "max": 2514.0, "count": 5}}, "TORETES": {"1": {"mean": 1396.36, "min": 1316.49, "max": 1558.48, "count": 4}, "2": {"mean": 1561.05, "min": 1436.74, "max": 1723.0, "count": 4}, "3": {"mean": 1610.75, "min": 1499.0, "max": 1837.0, "count": 4}, "4": {"mean": 1580.0, "min": 1425.0, "max": 1682.0, "count": 5}, "5": {"mean": 1680.25, "min": 1561.0, "max": 1866.0, "count": 4}, "6": {"mean": 1115.0, "min": 15.0, "max": 1747.0, "count": 3}, "7": {"mean": 2008.25, "min": 1827.0, "max": 2138.0, "count": 4}, "8": {"mean": 2011.25, "min": 1835.0, "max": 2241.0, "count": 4}, "9": {"mean": 2225.33, "min": 2154.0, "max": 2349.0, "count": 3}, "10": {"mean": 1786.75, "min": 224.0, "max": 2449.0, "count": 4}, "11": {"mean": 1869.67, "min": 1587.0, "max": 2186.0, "count": 3}, "12": {"mean": 1578.75, "min": 207.0, "max": 2188.0, "count": 4}}, "TOROS": {"1": {"mean": 1393.65, "min": 1224.77, "max": 1559.76, "count": 4}, "2": {"mean": 1249.32, "min": 1198.0, "max": 1296.0, "count": 4}, "3": {"mean": 1216.75, "min": 1032.0, "max": 1379.0, "count": 4}, "4": {"mean": 1183.8, "min": 1012.0, "max": 1381.0, "count": 5}, "5": {"mean": 1240.75, "min": 1185.0, "max": 1342.0, "count": 4}, "6": {"mean": 1489.0, "min": 1319.0, "max": 1668.0, "count": 4}, "7": {"mean": 1691.0, "min": 1389.0, "max": 1986.0, "count": 5}, "8": {"mean": 1845.75, "min": 1773.0, "max": 1961.0, "count": 4}, "9": {"mean": 1544.75, "min": 202.0, "max": 2245.0, "count": 4}, "10": {"mean": 1989.75, "min": 1792.0, "max": 2387.0, "count": 4}, "11": {"mean": 1861.33, "min": 1696.0, "max": 2047.0, "count": 3}, "12": {"mean": 1655.25, "min": 1255.0, "max": 1927.0, "count": 4}}, "VACA CARNAZA": {"1": {"mean": 759.95, "min": 649.4, "max": 946.07, "count": 4}, "2": {"mean": 847.1, "min": 598.97, "max": 998.71, "count": 4}}, "VACA CARNAZA EXPORT": {"1": {"mean": 926.93, "min": 645.0, "max": 1162.39, "count": 4}, "2": {"mean": 1029.04, "min": 993.0, "max": 1088.67, "count": 4}, "4": {"mean": 900.0, "min": 800.0, "max": 1032.0, "count": 3}, "5": {"mean": 775.0, "min": 775.0, "max": 775.0, "count": 1}, "6": {"mean": 1017.33, "min": 830.0, "max": 1119.0, "count": 3}, "7": {"mean": 1346.67, "min": 1236.0, "max": 1467.0, "count": 3}, "8": {"mean": 974.0, "min": 885.0, "max": 1063.0, "count": 2}, "9": {"mean": 1368.33, "min": 1251.0, "max": 1549.0, "count": 3}, "10": {"mean": 823.0, "min": 130.0, "max": 1516.0, "count": 2}, "12": {"mean": 1511.5, "min": 1352.0, "max": 1671.0, "count": 2}}, "VACA PARIDA": {"1": {"mean": 1296.32, "min": 1191.6, "max": 1417.49, "count": 4}, "2": {"mean": 1209.69, "min": 1157.87, "max": 1265.0, "count": 4}, "3": {"mean": 1178.75, "min": 1111.0, "max": 1284.0, "count": 4}, "4": {"mean": 1063.2, "min": 131.0, "max": 1457.0, "count": 5}, "5": {"mean": 1358.0, "min": 1295.0, "max": 1411.0, "count": 3}, "6": {"mean": 1499.0, "min": 1427.0, "max": 1636.0, "count": 4}, "7": {"mean": 1280.8, "min": 18.0, "max": 1893.0, "count": 5}, "8": {"mean": 1640.0, "min": 1538.0, "max": 1817.0, "count": 4}, "9": {"mean": 1862.33, "min": 1544.0, "max": 2154.0, "count": 3}, "10": {"mean": 1959.75, "min": 1834.0, "max": 2075.0, "count": 4}, "11": {"mean": 1998.33, "min": 1886.0, "max": 2143.0, "count": 3}, "12": {"mean": 1384.6, "min": 142.0, "max": 1807.0, "count": 5}}, "VACAS EXPORTACION": {"1": {"mean": 1292.38, "min": 1228.39, "max": 1333.83, "count": 4}, "2": {"mean": 1304.43, "min": 1258.59, "max": 1369.63, "count": 4}, "3": {"mean": 1341.25, "min": 1312.0, "max": 1382.0, "count": 4}, "4": {"mean": 1277.6, "min": 1204.0, "max": 1398.0, "count": 5}, "5": {"mean": 1308.75, "min": 1264.0, "max": 1347.0, "count": 4}, "6": {"mean": 1430.5, "min": 1387.0, "max": 1512.0, "count": 4}, "7": {"mean": 1116.8, "min": 147.0, "max": 1836.0, "count": 5}, "8": {"mean": 1686.0, "min": 1637.0, "max": 1769.0, "count": 4}, "9": {"mean": 1503.25, "min": 166.0, "max": 1972.0, "count": 4}, "10": {"mean": 1365.5, "min": 161.0, "max": 1818.0, "count": 4}, "11": {"mean": 1221.33, "min": 179.0, "max": 1781.0, "count": 3}, "12": {"mean": 1677.0, "min": 1564.0, "max": 1793.0, "count": 4}}, "VACAS GORDAS": {"1": {"mean": 1251.12, "min": 1202.7, "max": 1313.21, "count": 4}, "2": {"mean": 1229.98, "min": 1162.66, "max": 1274.27, "count": 4}, "4": {"mean": 948.8, "min": 113.0, "max": 1194.0, "count": 5}, "5": {"mean": 1196.0, "min": 1135.0, "max": 1228.0, "count": 4}, "6": {"mean": 1340.0, "min": 1322.0, "max": 1376.0, "count": 4}, "7": {"mean": 1583.2, "min": 1385.0, "max": 1834.0, "count": 5}, "8": {"mean": 1172.0, "min": 159.0, "max": 1547.0, "count": 4}, "9": {"mean": 1749.25, "min": 1591.0, "max": 1997.0, "count": 4}, "10": {"mean": 1727.5, "min": 1531.0, "max": 1906.0, "count": 4}, "11": {"mean": 1674.0, "min": 1655.0, "max": 1699.0, "count": 3}, "12": {"mean": 1378.2, "min": 181.0, "max": 1741.0, "count": 5}}, "VACAS GORDAS 6D": {"1": {"mean": 1398.82, "min": 1254.57, "max": 1708.1, "count": 4}, "2": {"mean": 1424.48, "min": 1235.8, "max": 1623.0, "count": 4}, "3": {"mean": 1521.75, "min": 1483.0, "max": 1558.0, "count": 4}, "4": {"mean": 1334.0, "min": 1248.0, "max": 1433.0, "count": 5}, "5": {"mean": 1215.0, "min": 1143.0, "max": 1293.0, "count": 4}, "6": {"mean": 973.67, "min": 158.0, "max": 1412.0, "count": 3}, "7": {"mean": 1476.0, "min": 129.0, "max": 2144.0, "count": 5}, "8": {"mean": 1359.5, "min": 178.0, "max": 1961.0, "count": 4}, "9": {"mean": 1699.0, "min": 1456.0, "max": 2099.0, "count": 4}, "10": {"mean": 1861.5, "min": 1529.0, "max": 2079.0, "count": 4}, "11": {"mean": 1781.33, "min": 1694.0, "max": 1841.0, "count": 3}, "12": {"mean": 1696.5, "min": 1587.0, "max": 1783.0, "count": 4}}, "VACAS GORDAS MDO NAC": {"3": {"mean": 1198.75, "min": 1102.0, "max": 1236.0, "count": 4}}, "VACAS P/ENGORDA": {"1": {"mean": 1088.19, "min": 984.02, "max": 1154.17, "count": 4}, "2": {"mean": 1062.6, "min": 989.88, "max": 1162.12, "count": 4}, "4": {"mean": 1044.8, "min": 993.0, "max": 1083.0, "count": 5}, "5": {"mean": 1093.0, "min": 1038.0, "max": 1167.0, "count": 4}, "6": {"mean": 1336.75, "min": 1126.0, "max": 1701.0, "count": 4}, "7": {"mean": 1283.5, "min": 1178.0, "max": 1461.0, "count": 4}, "8": {"mean": 1237.5, "min": 1109.0, "max": 1412.0, "count": 4}, "9": {"mean": 529.75, "min": 146.0, "max": 1637.0, "count": 4}, "10": {"mean": 1439.5, "min": 1048.0, "max": 1675.0, "count": 4}, "11": {"mean": 1601.0, "min": 1583.0, "max": 1619.0, "count": 2}, "12": {"mean": 861.8, "min": 155.0, "max": 1473.0, "count": 5}}, "VAQUILLA GORDA EXPORT": {"1": {"mean": 1504.48, "min": 1380.0, "max": 1618.0, "count": 4}, "2": {"mean": 1572.29, "min": 1518.0, "max": 1659.12, "count": 4}, "3": {"mean": 1429.75, "min": 176.0, "max": 2093.0, "count": 4}, "4": {"mean": 1807.8, "min": 1584.0, "max": 1962.0, "count": 5}, "5": {"mean": 1749.25, "min": 1485.0, "max": 1941.0, "count": 4}, "6": {"mean": 1534.75, "min": 197.0, "max": 2104.0, "count": 4}, "7": {"mean": 2111.4, "min": 1871.0, "max": 2297.0, "count": 5}, "8": {"mean": 2463.5, "min": 2334.0, "max": 2558.0, "count": 4}, "9": {"mean": 1757.25, "min": 231.0, "max": 2613.0, "count": 4}, "10": {"mean": 2348.25, "min": 1981.0, "max": 2705.0, "count": 4}, "11": {"mean": 1561.0, "min": 205.0, "max": 2345.0, "count": 3}, "12": {"mean": 2074.8, "min": 1875.0, "max": 2309.0, "count": 5}}, "VAQUILLAS ENGORDA": {"1": {"mean": 1556.47, "min": 1484.57, "max": 1638.07, "count": 4}, "2": {"mean": 1544.32, "min": 1485.1, "max": 1596.91, "count": 4}, "3": {"mean": 1634.75, "min": 1552.0, "max": 1686.0, "count": 4}, "4": {"mean": 968.4, "min": 158.0, "max": 1668.0, "count": 5}, "5": {"mean": 1663.0, "min": 1592.0, "max": 1743.0, "count": 4}, "6": {"mean": 1743.75, "min": 1693.0, "max": 1825.0, "count": 4}, "7": {"mean": 1872.4, "min": 1734.0, "max": 2052.0, "count": 5}, "8": {"mean": 1720.75, "min": 198.0, "max": 2391.0, "count": 4}, "9": {"mean": 1746.25, "min": 245.0, "max": 2405.0, "count": 4}, "10": {"mean": 2259.25, "min": 1916.0, "max": 2499.0, "count": 4}, "11": {"mean": 2119.0, "min": 2028.0, "max": 2291.0, "count": 3}, "12": {"mean": 1534.0, "min": 176.0, "max": 2102.0, "count": 5}}, "VAQUILLAS GORDAS": {"1": {"mean": 1743.82, "min": 1673.45, "max": 1802.0, "count": 4}, "2": {"mean": 1782.05, "min": 1684.64, "max": 1926.18, "count": 4}, "3": {"mean": 1832.75, "min": 1698.0, "max": 1971.0, "count": 4}, "4": {"mean": 1424.6, "min": 182.0, "max": 1953.0, "count": 5}, "5": {"mean": 1807.5, "min": 1694.0, "max": 1943.0, "count": 4}, "6": {"mean": 1924.5, "min": 1838.0, "max": 2025.0, "count": 4}, "7": {"mean": 1681.0, "min": 211.0, "max": 2197.0, "count": 5}, "8": {"mean": 2225.0, "min": 2053.0, "max": 2332.0, "count": 4}, "9": {"mean": 2290.75, "min": 1931.0, "max": 2464.0, "count": 4}, "10": {"mean": 2362.25, "min": 2055.0, "max": 2606.0, "count": 4}, "11": {"mean": 2247.0, "min": 2114.0, "max": 2452.0, "count": 3}, "12": {"mean": 913.0, "min": 205.0, "max": 1992.0, "count": 5}}}}, "animals_per_year": {"2024": ["BUEYES", "CABALLAR", "CABALLARES", "CERDO (INDUSTRIAL)", "CERDO (MALTON)", "CERDO INDUSTRIAL", "CERDO MALTON", "CORDEROS", "NOV.GORDO EXPORT", "NOVILLO GORDO", "NOVILLO GORDO 6D", "NOVILLO P/ENGORDA", "NOVILLOS P/EGDA.", "OVEJAS", "TERNERA", "TERNERAS", "TERNERO", "TERNEROS", "TORETE", "TORETES", "TORO", "TOROS", "VACA CARNAZA", "VACA CARNAZA EXPORT", "VACA EXPORTACION", "VACA GORDA", "VACA P/ENGORDA", "VACA PARIDA", "VACAS EXPORTACION", "VACAS GORDAS", "VACAS GORDAS 6D", "VACAS P/ENGORDA", "VAQUILLA GORDA", "VAQUILLA GORDA EXPOR", "VAQUILLA GORDA EXPORT", "VAQUILLA P/ENGORDA", "VAQUILLAS ENGORDA", "VAQUILLAS GORDAS"], "2025": ["BUEYES", "CABALLARES", "CERDO (INDUSTRIAL)", "CERDO (MALTON)", "NOVILLO GORDO", "NOVILLO GORDO 6D", "NOVILLOS P/EGDA.", "TERNERAS", "TERNEROS", "TORETES", "TOROS", "VACA CARNAZA", "VACA CARNAZA EXPORT", "VACA PARIDA", "VACAS EXPORTACION", "VACAS GORDAS", "VACAS GORDAS 6D", "VACAS GORDAS MDO NAC", "VACAS P/ENGORDA", "VAQUILLA GORDA EXPORT", "VAQUILLAS ENGORDA", "VAQUILLAS GORDAS"]}};
+
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+let currentYear = '2024';
+let chart = null;
+
+function setYear(y) {
+  currentYear = y;
+  document.querySelectorAll('.year-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.year-tab').forEach(t => { if(t.textContent === y) t.classList.add('active'); });
+  populateAnimals();
+  renderChart();
+}
+
+function populateAnimals() {
+  const sel = document.getElementById('animalSelect');
+  const animals = RAW.animals_per_year[currentYear];
+  const prev = sel.value;
+  sel.innerHTML = '';
+  animals.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a; opt.textContent = a;
+    sel.appendChild(opt);
+  });
+  if (animals.includes(prev)) sel.value = prev;
+}
+
+function fmt(n) { return n.toLocaleString('es-CL', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+
+function renderChart() {
+  const animal = document.getElementById('animalSelect').value;
+  const animalData = RAW.data[currentYear][animal];
+  if (!animalData) return;
+
+  const months = Object.keys(animalData).map(Number).sort((a,b) => a-b);
+  const labels = months.map(m => MESES[m-1]);
+  const means = months.map(m => animalData[m].mean);
+  const mins  = months.map(m => animalData[m].min);
+  const maxs  = months.map(m => animalData[m].max);
+  const counts = months.map(m => animalData[m].count);
+
+  // Stats
+  const allMeans = means.filter(v => v > 0);
+  const allMin = Math.min(...mins);
+  const allMax = Math.max(...maxs);
+  const overallAvg = allMeans.reduce((a,b) => a+b, 0) / allMeans.length;
+  const totalObs = counts.reduce((a,b) => a+b, 0);
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card avg"><div class="stat-label">Promedio Anual</div><div class="stat-value">${fmt(overallAvg)}</div><div class="stat-sub">Prom. Gral.</div></div>
+    <div class="stat-card max"><div class="stat-label">Máximo del Año</div><div class="stat-value">${fmt(allMax)}</div><div class="stat-sub">${MESES[months[maxs.indexOf(allMax)]-1]}</div></div>
+    <div class="stat-card min"><div class="stat-label">Mínimo del Año</div><div class="stat-value">${fmt(allMin)}</div><div class="stat-sub">${MESES[months[mins.indexOf(allMin)]-1]}</div></div>
+    <div class="stat-card cnt"><div class="stat-label">Total Observaciones</div><div class="stat-value">${totalObs}</div><div class="stat-sub">${months.length} meses con datos</div></div>
+  `;
+
+  document.getElementById('chartTitle').textContent = `${animal} – ${currentYear}`;
+  document.getElementById('chartSubtitle').textContent = `Promedio General mensual con banda de fluctuación Mínimo/Máximo`;
+
+  const minCol = 'rgba(46,204,113,0.85)';
+  const maxCol = 'rgba(231,76,60,0.85)';
+  const avgCol = 'rgba(52,152,219,1)';
+  const bandCol = 'rgba(52,152,219,0.13)';
+
+  const datasets = [
+    // Max line
+    { label: 'Máximo', data: maxs, borderColor: maxCol, backgroundColor: 'transparent',
+      borderWidth: 2, borderDash: [5,3], pointRadius: 5, pointBackgroundColor: maxCol,
+      pointBorderColor: 'white', pointBorderWidth: 2, tension: 0.3, fill: false, order: 1 },
+    // Shaded band between min and max (fill between dataset index 0 and 2)
+    { label: 'Banda Min-Max', data: maxs, borderColor: 'transparent', backgroundColor: bandCol,
+      fill: '+1', tension: 0.3, pointRadius: 0, order: 3 },
+    { label: '_min_fill', data: mins, borderColor: 'transparent', backgroundColor: bandCol,
+      fill: false, tension: 0.3, pointRadius: 0, order: 3 },
+    // Average line
+    { label: 'Promedio', data: means, borderColor: avgCol, backgroundColor: avgCol,
+      borderWidth: 3, pointRadius: 7, pointBackgroundColor: avgCol,
+      pointBorderColor: 'white', pointBorderWidth: 2.5, tension: 0.3, fill: false, order: 0 },
+    // Min line
+    { label: 'Mínimo', data: mins, borderColor: minCol, backgroundColor: 'transparent',
+      borderWidth: 2, borderDash: [5,3], pointRadius: 5, pointBackgroundColor: minCol,
+      pointBorderColor: 'white', pointBorderWidth: 2, tension: 0.3, fill: false, order: 2 },
+  ];
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,30,55,0.92)',
+          titleColor: '#a8c4e0',
+          bodyColor: '#e8f4ff',
+          padding: 14,
+          titleFont: { size: 13, weight: 'bold' },
+          bodyFont: { size: 12 },
+          callbacks: {
+            title: (items) => `${items[0].label} ${currentYear}`,
+            label: (item) => {
+              if (item.dataset.label.startsWith('_') || item.dataset.label === 'Banda Min-Max') return null;
+              const idx = item.dataIndex;
+              const n = counts[idx];
+              return `  ${item.dataset.label}: ${fmt(item.raw)}  (n=${n})`;
+            }
+          },
+          filter: (item) => !item.dataset.label.startsWith('_') && item.dataset.label !== 'Banda Min-Max'
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(180,200,220,0.18)' },
+          ticks: { color: '#4a6785', font: { weight: '600', size: 12 } }
+        },
+        y: {
+          grid: { color: 'rgba(180,200,220,0.18)' },
+          ticks: {
+            color: '#4a6785', font: { size: 11 },
+            callback: v => fmt(v)
+          },
+          title: { display: true, text: 'Promedio General (Prom. Gral.)', color: '#4a6785', font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+populateAnimals();
+renderChart();
+</script>
+</body>
+</html>
